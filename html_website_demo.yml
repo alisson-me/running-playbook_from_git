@@ -1,0 +1,96 @@
+- name: Deploy HTML Application
+  hosts: localhost
+  become: yes
+  tasks:
+    - name: Gather OS specific variables
+      set_fact:
+        httpd_pkg: "{{ 'httpd' if ansible_os_family == 'RedHat' else 'apache2' }}"
+        httpd_service: "{{ 'httpd' if ansible_os_family == 'RedHat' else 'apache2' }}"
+        httpd_user: "{{ 'apache' if ansible_os_family == 'RedHat' else 'www-data' }}"
+        httpd_group: "{{ 'apache' if ansible_os_family == 'RedHat' else 'www-data' }}"
+
+    - name: Update package cache (YUM)
+      yum:
+        name: "*"
+        state: latest
+      when: ansible_pkg_mgr == 'yum'
+
+    - name: Update package cache (APT)
+      apt:
+        update_cache: yes
+      when: ansible_pkg_mgr == 'apt'
+
+    - name: Ensure Apache is installed and running
+      package:
+        name: "{{ httpd_pkg }}"
+        state: present
+      notify: Restart Apache
+
+    - name: Ensure /var/www/html directory exists
+      file:
+        path: /var/www/html
+        state: directory
+        owner: "{{ httpd_user }}"
+        group: "{{ httpd_group }}"
+        mode: '0755'
+
+    - name: Create index.html
+      copy:
+        dest: /var/www/html/index.html
+        content: |
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <title>My HTML App</title>
+              <link rel="stylesheet" href="styles.css">
+              <style>
+              body {
+                  background-image: url("https://images.pexels.com/photos/296282/pexels-photo-296282.jpeg?cs=srgb&dl=pexels-goumbik-296282.jpg&fm=jpg");
+                  background-size: cover;
+              }
+          </style>
+          </head>
+          <body>
+              <h1> ITYOURWAY Ansible Class </h1>
+              <script src="script.js"></script>
+          </body>
+          </html>
+        owner: "{{ httpd_user }}"
+        group: "{{ httpd_group }}"
+        mode: '0644'
+
+    - name: Create styles.css
+      copy:
+        dest: /var/www/html/styles.css
+        content: |
+          body {
+              font-family: Arial, sans-serif;
+          }
+          h1 {
+              color: red;
+              text-align: center
+          }
+        owner: "{{ httpd_user }}"
+        group: "{{ httpd_group }}"
+        mode: '0644'
+
+    - name: Create script.js
+      copy:
+        dest: /var/www/html/script.js
+        content: |
+          document.addEventListener("DOMContentLoaded", function() {
+              console.log("Hello, World!");
+          });
+        owner: "{{ httpd_user }}"
+        group: "{{ httpd_group }}"
+        mode: '0644'
+
+  handlers:
+    - name: Restart Apache
+      service:
+        name: "{{ httpd_service }}"
+        state: restarted
+      loop:
+        - "{{ httpd_service }}"
+        - "{{ 'apache2' if httpd_service == 'httpd' else 'httpd' }}"
